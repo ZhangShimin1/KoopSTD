@@ -3,7 +3,7 @@
 <h3>Reliable Similarity Analysis between Dynamical Systems via Approximating Koopman Spectrum with Timescale Decoupling</h3>
 
 
-[Shimin Zhang](https://github.com/ZhangShimin1)<sup>1</sup> \*,[Ziyuan Ye](https://scholar.google.com/citations?user=CmzVixkAAAAJ)<sup>1</sup> \*, Yinsong Yan<sup>1</sup>, [Zeyang Song](https://scholar.google.com/citations?user=iTf0gegAAAAJ)<sup>1</sup> <sup>2</sup>, [Yujie Wu](https://scholar.google.com/citations?user=-lw0UPkAAAAJ)<sup>1</sup>, [Jibin Wu](https://scholar.google.com/citations?user=QwDyvrgAAAAJ)<sup>1 :email:</sup>
+[Shimin Zhang](https://github.com/ZhangShimin1)<sup>1</sup> \*,[Ziyuan Ye](https://scholar.google.com/citations?user=CmzVixkAAAAJ)<sup>1</sup> \*, [Yinsong Yan](https://openreview.net/profile?id=~Yinsong_Yan1)<sup>1</sup>, [Zeyang Song](https://scholar.google.com/citations?user=iTf0gegAAAAJ)<sup>1</sup> <sup>2</sup>, [Yujie Wu](https://scholar.google.com/citations?user=-lw0UPkAAAAJ)<sup>1</sup>, [Jibin Wu](https://scholar.google.com/citations?user=QwDyvrgAAAAJ)<sup>1 :email:</sup>
 
 <sup>1</sup>  The Hong Kong Polytechnic University, <sup>2</sup> National University of Singapore
 
@@ -11,7 +11,8 @@
 
 ICML 2025 [(paper)](https://github.com/ZhangShimin1/KoopSTD/)
 </div>
-If you experience problems with the code, please create a pull request or report the bug directly to Shimin and Ziyuan via email (shimin1.zhang@polyu.edu.hk and ziyuanye9801@gmail.com).
+
+If you experience problems with the code, please create a *pull request* or report the bug directly to [Shimin](mailto:shimin1.zhang@polyu.edu.hk) and [Ziyuan](mailto:ziyuanye9801@gmail.com).
 
 ## Overview
 To be updated
