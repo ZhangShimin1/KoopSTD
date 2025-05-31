@@ -1,8 +1,8 @@
 import sys
-from kmd import *
-from geometric import *
-from datasets import *
-from eval import MetricEvaluator
+from koopstd.kmd import *
+from koopstd.geometric import *
+from koopstd.datasets import *
+from koopstd.eval import MetricEvaluator
 
 import torch
 import numpy as np

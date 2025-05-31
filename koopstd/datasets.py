@@ -236,8 +236,8 @@ def bistable_switch(cohs,params,time=100,cond_avgs=None,seeded=False):
 class PDMAttractors:
     """
     A class for generating different types of attractor dynamics: bistable switch, line attractor, and point attractor.
-    
     This class provides methods to generate data from different dynamical systems and visualize their behavior.
+    Adapted from https://github.com/mitchellostrow/DSA.
     """
     
     def __init__(self, n_samples=5, n_trials=10, sigma=0, simul_step=100, dt=1, random_seed=None):

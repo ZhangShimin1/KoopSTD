@@ -3,8 +3,6 @@ import cupy as cp
 import torch
 import time
 
-
-
 class KMD:
     def __init__(self, data, rank=None, lamb=0.,
             backend='numpy', 
@@ -33,6 +31,7 @@ class KMD:
         self.rank = rank
         self.lamb = lamb
         self.verbose = verbose
+        self.A_v, self.E, self.S, self.V, self.Vh, self.W, self.W_prime = None, None, None, None, None, None, None
  
         # TODO: Backends specification
         # if backend == 'numpy':
@@ -145,13 +144,12 @@ class KoopSTD(KMD):
             self.E = self.E.squeeze(0)
 
     def compute_svd(self):
-        if self.E.ndim == 3: #flatten across trials for 3d
+        if self.E.ndim == 3: 
             E = self.E.reshape(self.E.shape[0] * self.E.shape[1], self.E.shape[2])
         else:
             E = self.E
         
-        U, self.S, self.V = torch.linalg.svd(E.T, full_matrices=False)
-        # print(U.shape, self.S.shape, self.V.shape)    
+        _, self.S, self.V = torch.linalg.svd(E.T, full_matrices=False)
 
         if E.shape[0] < E.shape[1]:  # T < N
             E = E[:, :E.shape[0]]
@@ -186,6 +184,27 @@ class KoopSTD(KMD):
         self.W = V_minus_rank
         self.W_prime = V_plus_rank
         
+    def residual_dmd(self):
+        """
+        Standard implementation of ResDMD, however, for the sake of efficiency, 
+        we don't recommend it in large dataset comparison.
+        """
+        self.Vt_minus = self.V[:-1]
+        self.Vt_plus = self.V[1:]
+
+        X_X = torch.matmul(self.Vt_plus.T.conj(), self.Vt_plus)
+        X_Y = torch.matmul(self.Vt_plus.T.conj(), self.Vt_minus)
+        Y_Y = torch.matmul(self.Vt_minus.T.conj(), self.Vt_minus)
+
+        A_full = torch.linalg.inv(self.Vt_minus.T @ self.Vt_minus) @ self.Vt_minus.T @ self.Vt_plus
+        _, egvalues, egvectors = torch.linalg.svd(A_full, full_matrices=True)
+        residuals = []
+        for j, (eigenvalue, eigenvector) in enumerate(zip(egvalues, egvectors.T)):
+            residual = self.compute_residual(X_X, X_Y, Y_Y, eigenvalue, eigenvector)
+            residuals.append(residual)
+        residuals = torch.tensor(residuals)
+        topk_indices = torch.topk(-residuals, self.rank, largest=False).indices
+        self.A_v = egvalues[topk_indices].view(-1,1)  # direct eigenvalues
     
     def compute_residuals(self, X_X, X_Y, Y_Y, eigenvalue, eigenvector):
         numerator = torch.matmul(
@@ -207,6 +226,10 @@ class HAVOK(KMD):
             device='cpu',
             verbose=False
         ):
+        """
+            The DMD part implementation of HAVOK-based DSA (Ostrow et al., 2024). 
+            Adapted from https://github.com/mitchellostrow/DSA.
+        """
         super().__init__(data, rank, lamb, backend, device, verbose)
         self.n_delays = n_delays
         self.delay_interval = delay_interval
@@ -246,8 +269,8 @@ class HAVOK(KMD):
             V_minus = V[:, :-1].reshape(new_shape)
             V_plus = V[:, 1:].reshape(new_shape)
         else:
-            V_minus = V[:-1]
-            V_plus = V[1:]
+            V_minus = self.V[:-1]
+            V_plus = self.V[1:]
         
         self.W = V_minus[:, :self.rank]
         self.W_prime = V_plus[:, :self.rank]
