@@ -9,7 +9,7 @@
 
 (\*) equal contribution, (<sup>:email:</sup>) corresponding author.
 
-ICML 2025 [(paper)](https://github.com/ZhangShimin1/KoopSTD/)
+ICML 2025 [(paper)](https://openreview.net/forum?id=29eZ8pWc8E)
 </div>
 
 If you experience problems with the code, please create a *pull request* or report the bug directly to [Shimin](mailto:shimin1.zhang@polyu.edu.hk) and [Ziyuan](mailto:ziyuanye9801@gmail.com).
