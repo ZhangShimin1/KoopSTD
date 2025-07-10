@@ -14,11 +14,9 @@ ICML 2025 [(paper)](https://openreview.net/forum?id=29eZ8pWc8E)
 
 If you experience problems with the code, please create a *pull request* or report the bug directly to [Shimin](mailto:shimin1.zhang@polyu.edu.hk) and [Ziyuan](mailto:ziyuanye9801@gmail.com).
 
-## Overview
-To be updated
-
 ## Environmental setup
-To be updated
+This requires Python version 3.7 or higher. Install all the necessary packages by:
+`pip install -r requirements.txt`
 
 ## Code description
 To be updated
