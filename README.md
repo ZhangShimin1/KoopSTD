@@ -18,6 +18,45 @@ If you experience problems with the code, please create a *pull request* or repo
 This requires Python version 3.9 or higher. Install all the necessary packages by:
 `pip install -r requirements.txt`
 
+# Basic usage
+Put the `koopstd` folder in your project's root folder.
+```python
+from koopstd.dynametric import KoopOpMetric
+from koopstd.eval import MetricEvaluator
+
+# Step 1: Prepare your data
+# data should be a list of numpy arrays
+# Each array has shape (n_trials, n_timepoints, n_dimensions)
+data = [system1_trajectories, system2_trajectories, ...]
+
+# Step 2: Set up KoopSTD parameters
+koopstd_params = {
+    'hop_size': 128,        # Window sliding step size
+    'win_len': 1024,        # Window length for analysis
+    'rank': 5,              # Rank for DMD approximation
+    'lamb': 0               # Regularization parameter
+}
+
+# Step 3: Set up distance metric parameters
+distance_params = {
+    'p': 1,                 # Order for Wasserstein distance
+    'method': 'emd'         # Earth Mover's Distance
+}
+
+# Step 4: Initialize KoopSTD metric
+koopstd = KoopOpMetric(
+    X=data,                          # Your trajectory data
+    kmd_method='koopstd',            # Method name
+    kmd_params=koopstd_params,       # KoopSTD parameters
+    dist='wasserstein',              # Distance metric
+    dist_params=distance_params,     # Distance parameters
+    device='cuda'                    # Use GPU if available
+)
+
+# Step 5: Compute distance matrix
+distance_matrix = koopstd.fit_score()
+```
+
 ## Citation
 ```
 @inproceedings{zhang2025koopstd,
