@@ -5,13 +5,13 @@ import time
 
 class KMD:
     def __init__(self, data, rank=None, lamb=0.,
-            backend='numpy', 
+            backend='numpy',
             device='cpu',
             verbose=False
         ):
         """
         Base class for Koopman Mode Decomposition.
-        
+
         Parameters:
         -----------
         data : array-like
@@ -32,7 +32,7 @@ class KMD:
         self.lamb = lamb
         self.verbose = verbose
         self.A_v, self.E, self.S, self.V, self.Vh, self.W, self.W_prime = None, None, None, None, None, None, None
- 
+
         # TODO: Backends specification
         # if backend == 'numpy':
         #     self.xp = np
@@ -42,7 +42,7 @@ class KMD:
         #     self.xp = torch
         # else:
         #     raise ValueError(f"Unsupported backend: {backend}. Choose from 'numpy', 'pytorch', or 'cupy'")
-        
+
 
     def init_data(self):
         if isinstance(self.data, np.ndarray):
@@ -54,23 +54,23 @@ class KMD:
             pass  # Already in the correct format (trials, timesteps, features)
         else:
             raise ValueError(f"Invalid data shape: {self.data.shape}. Expected 2D (samples, features) or 3D (trials, samples, features)")
-        
+
         self.n_trials, self.n_timesteps, self.n_features = self.data.shape
-        
+
     def embed(self):
-            
+
         raise NotImplementedError
-        
-    
+
+
     def compute_svd(self):
         """
         Compute the Singular Value Decomposition of the embedded data.
-        
+
         Parameters:
         -----------
         rank : int, optional
             Truncation rank for SVD. If None, full SVD is computed.
-            
+
         Returns:
         --------
         self : object
@@ -78,7 +78,7 @@ class KMD:
         """
         # Flatten embedding across trials if 3D
         E = self.E.reshape(self.E.shape[0] * self.E.shape[1], self.E.shape[2]) if self.E.ndim == 3 else self.E
-        
+
         U, self.S, self.Vh = torch.linalg.svd(E.T, full_matrices=False)
         self.V = self.Vh.T
 
@@ -87,7 +87,7 @@ class KMD:
 
         raise NotImplementedError
 
-    
+
     def compute_dmd(self):
         """
         Compute the Dynamic Mode Decomposition.
@@ -101,7 +101,7 @@ class KMD:
             regularization = torch.zeros(self.rank, self.rank).to(self.device)
 
         self.A_v = (torch.linalg.inv(self.W.T @ self.W + regularization) @ self.W.T @ self.W_prime).T
-        
+
 
     def fit(self):
         self.init_data()
@@ -114,7 +114,7 @@ class KMD:
 
 class KoopSTD(KMD):
     def __init__(self, data, rank=15, lamb=0., win_len=8, hop_size=1,
-            backend='numpy', 
+            backend='numpy',
             device='cpu',
             verbose=False
         ):
@@ -127,7 +127,7 @@ class KoopSTD(KMD):
 
         self.backend = backend
         self.device = device
-        self.verbose = verbose 
+        self.verbose = verbose
 
     def embed(self):
         # multivariate STFT
@@ -138,17 +138,17 @@ class KoopSTD(KMD):
         stfts = torch.stack(stfts, dim=1)
         trial, _, _, time_frames = stfts.shape
         stfts = stfts.view(trial, time_frames, -1).real.to(torch.float32)
- 
+
         self.E = stfts.to(self.device)
         if self.n_trials == 1:
             self.E = self.E.squeeze(0)
 
     def compute_svd(self):
-        if self.E.ndim == 3: 
+        if self.E.ndim == 3:
             E = self.E.reshape(self.E.shape[0] * self.E.shape[1], self.E.shape[2])
         else:
             E = self.E
-        
+
         _, self.S, self.V = torch.linalg.svd(E.T, full_matrices=False)
 
         if E.shape[0] < E.shape[1]:  # T < N
@@ -160,7 +160,7 @@ class KoopSTD(KMD):
         M = torch.matmul(self.E_minus.T.conj(), self.E_minus)
         N = torch.matmul(self.E_minus.T.conj(), self.E_plus)
         O = torch.matmul(self.E_plus.T.conj(), self.E_plus)
-        
+
         egvalues, egvectors = self.S, self.V
         residuals = []
         for j, (eigenvalue, eigenvector) in enumerate(zip(egvalues, egvectors.T)):
@@ -180,13 +180,13 @@ class KoopSTD(KMD):
             V_rank = V[:, topk_indices]
             V_minus_rank = V_rank[:-1]
             V_plus_rank = V_rank[1:]
-        
+
         self.W = V_minus_rank
         self.W_prime = V_plus_rank
-        
+
     def residual_dmd(self):
         """
-        Standard implementation of ResDMD, however, for the sake of efficiency, 
+        Standard implementation of ResDMD, however, for the sake of efficiency,
         we don't recommend it in large dataset comparison.
         """
         self.Vt_minus = self.V[:-1]
@@ -205,7 +205,7 @@ class KoopSTD(KMD):
         residuals = torch.tensor(residuals)
         topk_indices = torch.topk(-residuals, self.rank, largest=False).indices
         self.A_v = egvalues[topk_indices].view(-1,1)  # direct eigenvalues
-    
+
     def compute_residuals(self, X_X, X_Y, Y_Y, eigenvalue, eigenvector):
         numerator = torch.matmul(
             eigenvector.conj(),
@@ -218,16 +218,16 @@ class KoopSTD(KMD):
 
         residual = torch.sqrt(torch.abs(numerator) / torch.abs(denominator))
         return residual
-    
+
 
 class HAVOK(KMD):
     def __init__(self, data, rank=15, lamb=0., n_delays=8, delay_interval=1,
-            backend='numpy', 
+            backend='numpy',
             device='cpu',
             verbose=False
         ):
         """
-            The DMD part implementation of HAVOK-based DSA (Ostrow et al., 2024). 
+            The DMD part implementation of HAVOK-based DSA (Ostrow et al., 2024).
             Adapted from https://github.com/mitchellostrow/DSA.
         """
         super().__init__(data, rank, lamb, backend, device, verbose)
@@ -241,12 +241,12 @@ class HAVOK(KMD):
         # Hankel (delay) Embedding
         if self.data.shape[int(self.data.ndim==3)] - (self.n_delays - 1) * self.delay_interval < 1:
             raise ValueError("The number of delays is too large for the number of time points in the data!")
-        
+
         if self.data.ndim == 3:
             embedding = torch.zeros((self.data.shape[0], self.data.shape[1] - (self.n_delays - 1) * self.delay_interval, self.data.shape[2] * self.n_delays))
         else:
             embedding = torch.zeros((self.data.shape[0] - (self.n_delays - 1) * self.delay_interval, self.data.shape[1] * self.n_delays))
-        
+
         for d in range(self.n_delays):
             index = (self.n_delays - 1 - d) * self.delay_interval
             ddelay = d * self.delay_interval
@@ -257,7 +257,7 @@ class HAVOK(KMD):
             else:
                 ddata = d * self.data.shape[1]
                 embedding[:, ddata:ddata + self.data.shape[1]] = self.data[index:self.data.shape[0] - ddelay]
-    
+
         self.E = embedding.to(self.device)
         if self.n_trials == 1:
             self.E = self.E.squeeze(0)
@@ -271,7 +271,7 @@ class HAVOK(KMD):
         else:
             V_minus = self.V[:-1]
             V_plus = self.V[1:]
-        
+
         self.W = V_minus[:, :self.rank]
         self.W_prime = V_plus[:, :self.rank]
 
