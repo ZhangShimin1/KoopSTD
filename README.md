@@ -33,7 +33,7 @@ data = [system1_trajectories, system2_trajectories, ...]
 koopstd_params = {
     'hop_size': 128,        # Window sliding step size of STFT
     'win_len': 1024,        # Window length STFT
-    'rank': 5,              # Rank for DMD approximation
+    'rank': 5,              # The first rank modes with the smallest residual
     'lamb': 0               # Regularization parameter
 }
 
