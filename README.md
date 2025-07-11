@@ -18,9 +18,6 @@ If you experience problems with the code, please create a *pull request* or repo
 This requires Python version 3.9 or higher. Install all the necessary packages by:
 `pip install -r requirements.txt`
 
-## Code description
-To be updated
-
 ## Citation
 ```
 @inproceedings{zhang2025koopstd,
