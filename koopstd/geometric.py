@@ -22,7 +22,7 @@ def pad_zeros(A,B,device):
 
 class LearnableSimilarityTransform(torch.nn.Module):
     """
-    Computes the similarity transform for a learnable orthonormal matrix C 
+    Computes the similarity transform for a learnable orthonormal matrix C
     """
     def __init__(self, n,orthog=True):
         """
@@ -35,7 +35,7 @@ class LearnableSimilarityTransform(torch.nn.Module):
         #initialize orthogonal matrix as identity
         self.C = torch.nn.Parameter(torch.eye(n).float())
         self.orthog = orthog
-        
+
     def forward(self, B):
         if self.orthog:
             return self.C @ B @ self.C.transpose(-1, -2)
@@ -46,10 +46,10 @@ class Skew(torch.nn.Module):
     def __init__(self,n,device):
         """
         Computes a skew-symmetric matrix X from some parameters (also called X)
-        
+
         """
         super().__init__()
-      
+
         self.L1 = torch.nn.Linear(n,n,bias = False, device = device)
         self.L2 = torch.nn.Linear(n,n,bias = False, device = device)
         self.L3 = torch.nn.Linear(n,n,bias = False, device = device)
@@ -64,10 +64,10 @@ class Matrix(torch.nn.Module):
     def __init__(self,n,device):
         """
         Computes a matrix X from some parameters (also called X)
-        
+
         """
         super().__init__()
-      
+
         self.L1 = torch.nn.Linear(n,n,bias = False, device = device)
         self.L2 = torch.nn.Linear(n,n,bias = False, device = device)
         self.L3 = torch.nn.Linear(n,n,bias = False, device = device)
@@ -87,9 +87,9 @@ class CayleyMap(torch.nn.Module):
         Parameters
         __________
 
-        n : int 
+        n : int
             dimension of the matrix we want to map
-        
+
         device : {'cpu','cuda'} or int
             hardware device on which to send the matrix
         """
@@ -99,14 +99,14 @@ class CayleyMap(torch.nn.Module):
     def forward(self, X):
         # (I + X)(I - X)^{-1}
         return torch.linalg.solve(self.Id + X, self.Id - X)
-    
+
 
 class ProcrustesDistance:
     """
     Computes the Procrustes Analysis over Vector Fields
     """
     def __init__(self,
-                iters=200, 
+                iters=200,
                 score_method: Literal["angular", "euclidean"] = "angular",
                 lr=0.01,
                 device: Literal["cpu", "cuda"] = 'cuda',
@@ -118,9 +118,9 @@ class ProcrustesDistance:
         _________
         iters : int
             number of iterations to perform gradient descent
-        
+
         score_method : {"angular", "euclidean"}
-            specifies the type of metric to use 
+            specifies the type of metric to use
 
         lr : float
             learning rate
@@ -130,7 +130,7 @@ class ProcrustesDistance:
 
         verbose : bool
             prints when finished optimizing
-        
+
         group : {'SO(n)', 'O(n)', 'GL(n)'}
             specifies the group of matrices to optimize over
         """
@@ -144,11 +144,11 @@ class ProcrustesDistance:
         self.B = None
         self.group = group
 
-    def fit(self, 
-            A, 
-            B, 
-            iters=None, 
-            lr=None, 
+    def fit(self,
+            A,
+            B,
+            iters=None,
+            lr=None,
             group=None
             ):
         """
@@ -173,12 +173,12 @@ class ProcrustesDistance:
         """
         assert A.shape[0] == A.shape[1]
         assert B.shape[0] == B.shape[1]
-    
+
         A = A.to(self.device)
         B = B.to(self.device)
         self.A, self.B = A, B
         lr = self.lr if lr is None else lr
-        iters = self.iters if iters is None else iters            
+        iters = self.iters if iters is None else iters
         group = self.group if group is None else group
 
         if group in {"SO(n)", "O(n)"}:
@@ -217,7 +217,7 @@ class ProcrustesDistance:
             parametrize.register_parametrization(sim_net, "C", CayleyMap(n, self.device))
         else:
             parametrize.register_parametrization(sim_net, "C", Matrix(n, self.device))
-        
+
         simdist_loss = nn.MSELoss(reduction='sum')
 
         optimizer = optim.Adam(sim_net.parameters(), lr=lr)
@@ -228,7 +228,7 @@ class ProcrustesDistance:
         B /= torch.linalg.norm(B)
         for _ in range(iters):
             # Zero the gradients of the optimizer.
-            optimizer.zero_grad()      
+            optimizer.zero_grad()
             # Compute the Frobenius norm between A and the product.
             loss = simdist_loss(A, sim_net(B))
 
@@ -244,7 +244,7 @@ class ProcrustesDistance:
 
         C_star = sim_net.C.detach()
         return losses, C_star, sim_net
-    
+
     def score(self, A=None, B=None, score_method=None, group=None):
         """
         Given an optimal C already computed, calculate the metric
@@ -259,7 +259,7 @@ class ProcrustesDistance:
             overwrites the score method in the object for this application
         group : {'SO(n)', 'O(n)', 'GL(n)'} or None
             specifies the group of matrices to optimize over
-            
+
         Returns
         _______
         score : float
@@ -267,7 +267,7 @@ class ProcrustesDistance:
         """
         assert self.C_star is not None
         A = self.A if A is None else A
-        B = self.B if B is None else B 
+        B = self.B if B is None else B
         assert A is not None
         assert B is not None
         assert A.shape == self.C_star.shape
@@ -287,9 +287,9 @@ class ProcrustesDistance:
             Cinv = torch.linalg.inv(C)
         else:
             raise AssertionError("Need proper group name")
-            
-        if score_method == 'angular':    
-            num = torch.trace(A.T @ C @ B @ Cinv) 
+
+        if score_method == 'angular':
+            num = torch.trace(A.T @ C @ B @ Cinv)
             den = torch.norm(A, p='fro') * torch.norm(B, p='fro')
             score = torch.arccos(num/den).cpu().numpy()
             if np.isnan(score):  # around -1 and 1, we sometimes get NaNs due to arccos
@@ -299,19 +299,19 @@ class ProcrustesDistance:
                     score = 0
         else:
             score = torch.norm(A - C @ B @ Cinv, p='fro').cpu().numpy().item()
-    
+
         return score
-    
+
     def compute(self, A, B):
         """
-        For efficiency, computes the optimal matrix and returns the score 
+        For efficiency, computes the optimal matrix and returns the score
 
         Parameters
         __________
         A : np.array or torch.tensor
             first data matrix
         B : np.array or torch.tensor
-            second data matrix        
+            second data matrix
         iters : int or None
             number of optimization steps, if None then resorts to saved self.iters
         lr : float or None
@@ -320,7 +320,7 @@ class ProcrustesDistance:
             overwrites parameter in the class
         group : {'SO(n)', 'O(n)', 'GL(n)'} or None
             specifies the group of matrices to optimize over
-            
+
         Returns
         _______
         score : float
@@ -335,7 +335,7 @@ class ProcrustesDistance:
         assert A.shape[0] == A.shape[1]
         assert B.shape[0] == B.shape[1]
         assert A.shape[0] == B.shape[0], "Matrices must be the same size"
-       
+
         self.fit(A, B, iters=self.iters, lr=self.lr, group=self.group)
         score_star = self.score(self.A, self.B, score_method=self.score_method, group=self.group)
 
@@ -345,19 +345,19 @@ class ProcrustesDistance:
 class WassersteinDistance:
     """
     A class for computing Wasserstein distances between distributions using optimal transport.
-    
+
     This class implements methods for computing Wasserstein distances between
     distributions represented as samples or histograms.
     """
-    
-    def __init__(self, 
+
+    def __init__(self,
                  p: int = 2,
                  method: Literal['emd', 'sinkhorn'] = 'emd',
                  reg: float = 0.01,
                  device: str = 'cuda'):
         """
         Initialize the WassersteinDistance object.
-        
+
         Parameters:
         -----------
         p : int, default=2
@@ -373,21 +373,21 @@ class WassersteinDistance:
         self.method = method
         self.reg = reg
         self.device = device
-        
+
         # Validate parameters
         if method not in ['emd', 'sinkhorn']:
             raise ValueError("Method must be one of 'emd' or 'sinkhorn'")
         if p < 1:
             raise ValueError("Order p must be at least 1")
-    
-    def compute_from_distributions(self, 
-                X: Union[np.ndarray, torch.Tensor], 
+
+    def compute_from_distributions(self,
+                X: Union[np.ndarray, torch.Tensor],
                 Y: Union[np.ndarray, torch.Tensor],
                 a: Optional[Union[np.ndarray, torch.Tensor]] = None,
                 b: Optional[Union[np.ndarray, torch.Tensor]] = None) -> float:
         """
         Compute the Wasserstein distance between two distributions.
-        
+
         Parameters:
         -----------
         X : numpy.ndarray or torch.Tensor
@@ -398,7 +398,7 @@ class WassersteinDistance:
             Weights for first distribution (if None, uniform weights are used)
         b : numpy.ndarray or torch.Tensor, optional
             Weights for second distribution (if None, uniform weights are used)
-            
+
         Returns:
         --------
         distance : float
@@ -409,48 +409,48 @@ class WassersteinDistance:
             X = torch.from_numpy(X).float().to(self.device)
         if isinstance(Y, np.ndarray):
             Y = torch.from_numpy(Y).float().to(self.device)
-        
+
         # Ensure X and Y are 2D
         if X.dim() == 1:
             X = X.view(-1, 1)
         if Y.dim() == 1:
             Y = Y.view(-1, 1)
-        
+
         # Create uniform weights if not provided
         if a is None:
             a = torch.ones(X.shape[0], device=self.device) / X.shape[0]
         elif isinstance(a, np.ndarray):
             a = torch.from_numpy(a).float().to(self.device)
-            
+
         if b is None:
             b = torch.ones(Y.shape[0], device=self.device) / Y.shape[0]
         elif isinstance(b, np.ndarray):
             b = torch.from_numpy(b).float().to(self.device)
-        
+
         # Compute cost matrix (p-th power of Euclidean distance)
         M = ot.dist(X, Y)
         if self.p != 1:
             M = M ** (self.p / 2)  # Since ot.dist returns squared Euclidean distance
-        
+
         # Compute Wasserstein distance
         if self.method == 'emd':
             distance = ot.emd2(a, b, M)
         else:  # sinkhorn, supports gradient descent
             distance = ot.sinkhorn2(a, b, M, self.reg)
-        
+
         # Take p-th root for Wp distance
         if self.p != 1:
             distance = distance ** (1.0 / self.p)
-            
+
         return distance.item()
-    
-    
+
+
     def compute(self, X_features: Union[np.ndarray, torch.Tensor],
                       Y_features: Optional[Union[np.ndarray, torch.Tensor]] = None,
                       feature_type: Literal['sv', 'eig'] = 'sv') -> float:
         """
         Compute Wasserstein distance between matrices based on their features (singular values or eigenvalues).
-        
+
         Parameters:
         -----------
         X_features : numpy.ndarray or torch.Tensor
@@ -459,7 +459,7 @@ class WassersteinDistance:
             Second matrix (if None, uses X_features)
         feature_type : str, default='sv'
             Type of features to extract: 'sv' for singular values, 'eig' for eigenvalues
-            
+
         Returns:
         --------
         distance : float
@@ -467,13 +467,13 @@ class WassersteinDistance:
         """
         if Y_features is None:
             raise ValueError("Y_features must be provided")
-            
+
         # Convert numpy arrays to torch tensors if needed
         if isinstance(X_features, np.ndarray):
             X_features = torch.from_numpy(X_features).float().to(self.device)
         if isinstance(Y_features, np.ndarray):
             Y_features = torch.from_numpy(Y_features).float().to(self.device)
-        
+
         # Extract features
         if feature_type == "sv":
             a = torch.svd(X_features).S.view(-1, 1)
@@ -485,6 +485,6 @@ class WassersteinDistance:
             b = torch.vstack([b.real, b.imag]).T
         else:
             raise ValueError(f"Unknown feature type: {feature_type}. Use 'sv' or 'eig'")
-        
+
         # Compute Wasserstein distance
         return self.compute_from_distributions(a, b)
