@@ -31,8 +31,8 @@ data = [system1_trajectories, system2_trajectories, ...]
 
 # Step 2: Set up KoopSTD parameters
 koopstd_params = {
-    'hop_size': 128,        # Window sliding step size
-    'win_len': 1024,        # Window length for analysis
+    'hop_size': 128,        # Window sliding step size of STFT
+    'win_len': 1024,        # Window length STFT
     'rank': 5,              # Rank for DMD approximation
     'lamb': 0               # Regularization parameter
 }
