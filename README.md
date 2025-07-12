@@ -19,15 +19,15 @@ This requires Python version 3.9 or higher. Install all the necessary packages b
 `pip install -r requirements.txt`
 
 # Basic usage
-Put the `koopstd` folder in your project's root folder.
+For the experiments presented in our paper, we compare the distance between every pair of samples in a dataset.
 ```python
 from koopstd.dynametric import KoopOpMetric
 from koopstd.eval import MetricEvaluator
 
 # Step 1: Prepare your data
-# data should be a list of numpy arrays
-# Each array has shape (n_trials, n_timepoints, n_dimensions)
-data = [system1_trajectories, system2_trajectories, ...]
+# data should be a list of numpy arrays or torch tenosrs
+# Each array represents a trajectroy with the shape of (n_trials, n_timepoints, n_dimensions) or (n_timepoints, n_dimensions) sampled by the system
+data = [trajectory1, trajectory2, ...]
 
 # Step 2: Set up KoopSTD parameters
 koopstd_params = {
@@ -46,11 +46,11 @@ distance_params = {
 # Step 4: Initialize KoopSTD metric
 koopstd = KoopOpMetric(
     X=data,                          # Your trajectory data
-    kmd_method='koopstd',            # Method name
+    kmd_method='koopstd',            
     kmd_params=koopstd_params,       # KoopSTD parameters
     dist='wasserstein',              # Distance metric
     dist_params=distance_params,     # Distance parameters
-    device='cuda'                    # Use GPU if available
+    device='cuda'                    # Specify the gpu
 )
 
 # Step 5: Compute distance matrix
