@@ -12,7 +12,6 @@
 ICML 2025 [(paper)](https://openreview.net/forum?id=29eZ8pWc8E)
 </div>
 
-If you experience problems with the code, please create a *pull request* or report the bug directly to [Shimin](mailto:shimin1.zhang@polyu.edu.hk) and [Ziyuan](mailto:ziyuanye9801@gmail.com).
 
 ## Environmental setup
 This requires Python version 3.9 or higher. Install all the necessary packages by:
