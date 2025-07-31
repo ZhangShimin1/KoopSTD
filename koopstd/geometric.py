@@ -354,7 +354,8 @@ class WassersteinDistance:
                  p: int = 2,
                  method: Literal['emd', 'sinkhorn'] = 'emd',
                  reg: float = 0.01,
-                 device: str = 'cuda'):
+                 device: str = 'cuda',
+                 feature_type: Literal['sv', 'eig'] = 'eig'):
         """
         Initialize the WassersteinDistance object.
 
@@ -373,7 +374,7 @@ class WassersteinDistance:
         self.method = method
         self.reg = reg
         self.device = device
-
+        self.feature_type = feature_type
         # Validate parameters
         if method not in ['emd', 'sinkhorn']:
             raise ValueError("Method must be one of 'emd' or 'sinkhorn'")
@@ -447,7 +448,7 @@ class WassersteinDistance:
 
     def compute(self, X_features: Union[np.ndarray, torch.Tensor],
                       Y_features: Optional[Union[np.ndarray, torch.Tensor]] = None,
-                      feature_type: Literal['sv', 'eig'] = 'sv') -> float:
+                      feature_type: Literal['sv', 'eig'] = None) -> float:
         """
         Compute Wasserstein distance between matrices based on their features (singular values or eigenvalues).
 
@@ -473,7 +474,7 @@ class WassersteinDistance:
             X_features = torch.from_numpy(X_features).float().to(self.device)
         if isinstance(Y_features, np.ndarray):
             Y_features = torch.from_numpy(Y_features).float().to(self.device)
-
+        feature_type = self.feature_type if feature_type is None else feature_type
         # Extract features
         if feature_type == "sv":
             a = torch.svd(X_features).S.view(-1, 1)
