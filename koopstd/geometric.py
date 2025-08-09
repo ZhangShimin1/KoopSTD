@@ -473,7 +473,7 @@ class WassersteinDistance:
             X_features = torch.from_numpy(X_features).float().to(self.device)
         if isinstance(Y_features, np.ndarray):
             Y_features = torch.from_numpy(Y_features).float().to(self.device)
-
+        feature_type = self.feature_type if feature_type is None else feature_type
         # Extract features
         feature_type = self.feature_type if feature_type is None else feature_type
         if feature_type == "sv":
