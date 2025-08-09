@@ -42,7 +42,6 @@ class KMD:
         # else:
         #     raise ValueError(f"Unsupported backend: {backend}. Choose from 'numpy', 'pytorch', or 'cupy'")
 
-
     def init_data(self):
         if isinstance(self.data, np.ndarray):
             self.data = torch.from_numpy(self.data).to(self.device)
@@ -218,59 +217,4 @@ class KoopSTD(KMD):
         residual = torch.sqrt(torch.abs(numerator) / torch.abs(denominator))
         return residual
 
-
-class HAVOK(KMD):
-    def __init__(self, data, rank=15, lamb=0., n_delays=8, delay_interval=1,
-            backend='numpy',
-            device='cpu',
-            verbose=False
-        ):
-        """
-            The DMD part implementation of HAVOK-based DSA (Ostrow et al., 2024).
-            Adapted from https://github.com/mitchellostrow/DSA.
-        """
-        super().__init__(data, rank, lamb, backend, device, verbose)
-        self.n_delays = n_delays
-        self.delay_interval = delay_interval
-        self.rank = rank
-        self.lamb = lamb
-        self.data = data
-
-    def embed(self):
-        # Hankel (delay) Embedding
-        if self.data.shape[int(self.data.ndim==3)] - (self.n_delays - 1) * self.delay_interval < 1:
-            raise ValueError("The number of delays is too large for the number of time points in the data!")
-
-        if self.data.ndim == 3:
-            embedding = torch.zeros((self.data.shape[0], self.data.shape[1] - (self.n_delays - 1) * self.delay_interval, self.data.shape[2] * self.n_delays))
-        else:
-            embedding = torch.zeros((self.data.shape[0] - (self.n_delays - 1) * self.delay_interval, self.data.shape[1] * self.n_delays))
-
-        for d in range(self.n_delays):
-            index = (self.n_delays - 1 - d) * self.delay_interval
-            ddelay = d * self.delay_interval
-
-            if self.data.ndim == 3:
-                ddata = d * self.data.shape[2]
-                embedding[:,:, ddata: ddata + self.data.shape[2]] = self.data[:,index:self.data.shape[1] - ddelay]
-            else:
-                ddata = d * self.data.shape[1]
-                embedding[:, ddata:ddata + self.data.shape[1]] = self.data[index:self.data.shape[0] - ddelay]
-
-        self.E = embedding.to(self.device)
-        if self.n_trials == 1:
-            self.E = self.E.squeeze(0)
-
-    def reduced_rank(self):
-        if self.n_trials > 1:
-            V = self.V.reshape(self.E.shape)
-            new_shape = (self.E.shape[0] * (self.E.shape[1] - 1), self.E.shape[2])
-            V_minus = V[:, :-1].reshape(new_shape)
-            V_plus = V[:, 1:].reshape(new_shape)
-        else:
-            V_minus = self.V[:-1]
-            V_plus = self.V[1:]
-
-        self.W = V_minus[:, :self.rank]
-        self.W_prime = V_plus[:, :self.rank]
 

@@ -100,7 +100,6 @@ class CayleyMap(torch.nn.Module):
         # (I + X)(I - X)^{-1}
         return torch.linalg.solve(self.Id + X, self.Id - X)
 
-
 class ProcrustesDistance:
     """
     Computes the Procrustes Analysis over Vector Fields
@@ -354,8 +353,8 @@ class WassersteinDistance:
                  p: int = 2,
                  method: Literal['emd', 'sinkhorn'] = 'emd',
                  reg: float = 0.01,
-                 device: str = 'cuda',
-                 feature_type: Literal['sv', 'eig'] = 'eig'):
+                 feature_type: Literal['sv', 'eig'] = 'sv',
+                 device: str = 'cuda'):
         """
         Initialize the WassersteinDistance object.
 
@@ -448,7 +447,7 @@ class WassersteinDistance:
 
     def compute(self, X_features: Union[np.ndarray, torch.Tensor],
                       Y_features: Optional[Union[np.ndarray, torch.Tensor]] = None,
-                      feature_type: Literal['sv', 'eig'] = None) -> float:
+                      feature_type: Optional[Literal['sv', 'eig']] = None) -> float:
         """
         Compute Wasserstein distance between matrices based on their features (singular values or eigenvalues).
 
@@ -476,6 +475,7 @@ class WassersteinDistance:
             Y_features = torch.from_numpy(Y_features).float().to(self.device)
         feature_type = self.feature_type if feature_type is None else feature_type
         # Extract features
+        feature_type = self.feature_type if feature_type is None else feature_type
         if feature_type == "sv":
             a = torch.svd(X_features).S.view(-1, 1)
             b = torch.svd(Y_features).S.view(-1, 1)

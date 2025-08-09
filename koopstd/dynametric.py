@@ -2,7 +2,6 @@ import sys
 from koopstd.kmd import *
 from koopstd.geometric import *
 from koopstd.datasets import *
-from koopstd.eval import MetricEvaluator
 
 import torch
 import numpy as np
@@ -145,7 +144,7 @@ class KoopOpMetric(BaseSimilarityMetric):
             if kmd_method == 'koopstd':
                 self.kmds.append([KoopSTD(d, **self.kmd_params) for d in dataset])
             elif kmd_method == 'havok':
-                self.kmds.append([HAVOK(d, **self.kmd_params) for d in dataset])
+                raise NotImplementedError("Please refer to https://github.com/mitchellostrow/DSA for official HAVOK-based DSA implementation")
             else:
                 raise ValueError(f"Unknown KMD: {kmd_method}")
 
@@ -192,82 +191,3 @@ class KoopOpMetric(BaseSimilarityMetric):
             return self.calculate_dist_matrix(self.kmds[0], self.kmds[1])
         else:
             return self.calculate_dist_matrix(self.kmds[0])
-
-
-
-if __name__ == "__main__":
-    from datasets import Lorenz63
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-
-    # dataset = Lorenz63(rho_values=[10, 20, 152, 220, 75], num_clips=40)
-    # data = dataset.data
-    # print(data[0].shape)
-
-    # # kmd_params = {'hop_size': 1, 'win_len': 500, 'rank': 10, 'lamb': 0}
-    # # dist_params = {'p': 1, 'method': 'emd'}
-
-    # kmd_params = {'n_delays': 40, 'delay_interval': 5, 'rank': 10}
-    # dist_params = {'score_method': '', 'group': 'O(n)', 'iters': 1000, 'lr': 0.01}
-
-    # koopstd = KoopOpMetric(X=data, kmd_method='havok', kmd_params=kmd_params, dist='wasserstein', dist_params=dist_params, device='cuda')
-    # dist_matrix = koopstd.fit_score()
-
-    pdm = PDMAttractors(n_samples=10, n_trials=100, sigma=0.05, simul_step=100, dt=0.01)
-    data = pdm.get_data()
-    data = [data[i] for i in range(30)]
-
-    kmd_params = {'hop_size': 128, 'win_len': 1024, 'rank': 5, 'lamb': 0}
-    dist_params = {'p': 1, 'method': 'emd'}
-    koopstd = KoopOpMetric(X=data, kmd_method='koopstd', kmd_params=kmd_params, dist='wasserstein', dist_params=dist_params, device='cuda')
-
-    # kmd_params = {'n_delays': 50, 'delay_interval': 20, 'rank': 20}
-    # dist_params = {'p': 1, 'method': 'emd'}
-    # koopstd = KoopOpMetric(X=data, kmd_method='havok', kmd_params=kmd_params, dist='wasserstein', dist_params=dist_params, device='cuda')
-
-    dist_matrix = koopstd.fit_score()
-
-
-    me = MetricEvaluator(distance_matrix=dist_matrix, cluster_sizes=[10, 10, 10])
-    silhouette = me.evaluate()
-    print(silhouette)
-
-    # Create a figure with two subplots
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-
-    # Plot heatmap
-    sns.heatmap(dist_matrix, cmap='viridis', ax=axes[0])
-    axes[0].set_title('Distance Matrix')
-
-    # Perform t-SNE for visualization
-    from sklearn.manifold import TSNE, MDS
-    import pandas as pd
-
-    # Create t-SNE embedding
-    # vis = TSNE(n_components=2, perplexity=30, random_state=42)
-    vis = MDS(n_components=2, dissimilarity='precomputed')
-    embedding = vis.fit_transform(dist_matrix)
-
-    # Create DataFrame for scatter plot
-    df = pd.DataFrame()
-    df["x"] = embedding[:, 0]
-    df["y"] = embedding[:, 1]
-
-    # Add labels for different rho values
-    rho_labels = []
-    # for rho in [10, 20, 152, 220, 75]:
-    for rho in [1, 2, 3]:
-        rho_labels.extend([f"{rho}"] * 10)  # 10 clips per rho value
-    df["System"] = rho_labels
-    # Save the t-SNE coordinates to a CSV file
-    csv_filename = 'havok_lorenz_coordinates.csv'
-    df.to_csv(csv_filename, index=False)
-
-    # Plot scatter
-    sns.scatterplot(data=df, x="x", y="y", hue="System", ax=axes[1], s=100, alpha=0.7)
-    axes[1].set_title('t-SNE Projection')
-    axes[1].set_xlabel('t-SNE-1')
-    axes[1].set_ylabel('t-SNE-2')
-
-    plt.tight_layout()
-    plt.savefig('lorenz_koopstd.png')

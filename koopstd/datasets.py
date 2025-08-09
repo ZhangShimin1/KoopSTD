@@ -23,7 +23,7 @@ class Lorenz63:
         data (list): Generated trajectory data.
     """
     def __init__(self, rho_values, initial_state=(-8, 8, 27), t_start=0, t_end=800,
-                 dt=0.001, period_length=20, num_clips=25, random_seed=None):
+                 dt=0.001, period_length=20, num_clips=25, random_seed=2025):
         """
         Initialize the Lorenz dataset with specified parameters.
 
@@ -115,7 +115,7 @@ class Lorenz63:
             # Calculate clip size
             clip_size = int(self.period_length / self.dt)
 
-            for k in range(self.num_clips):
+            for _ in range(self.num_clips):
                 # Randomly select clips from the valid data
                 max_start_index = valid_length - clip_size
                 if max_start_index > 0:
@@ -146,7 +146,6 @@ class Lorenz63:
 
         # Create figure with subplots
         fig = plt.figure(figsize=(4*n_rho, 4))
-
         # Create a subplot for each rho value
         for i, rho in enumerate(self.rho_values):
             ax = fig.add_subplot(1, n_rho, i+1, projection='3d')
