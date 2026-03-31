@@ -1,6 +1,12 @@
 import numpy as np
 import torch
+import torch.nn as nn
 import time
+from torch.utils.data import DataLoader
+from torch.utils.data import TensorDataset
+from tqdm import tqdm
+
+torch.manual_seed(42)
 
 class KMD:
     def __init__(self, data, rank=None, lamb=0.,
@@ -217,4 +223,190 @@ class KoopSTD(KMD):
         residual = torch.sqrt(torch.abs(numerator) / torch.abs(denominator))
         return residual
 
+class TrainResKoopNet:
+    def __init__(self, data, rank=15, lamb=0.01, learning_rate=0.001, epochs=10, device='cuda'):
+        self.rank = rank
+        self.lamb = lamb
+        self.data = data
+        self.device = device
+        win_len = min([x.shape[0] for x in data])
+        self.hs_dataset = self.create_hs_dataset(win_len=win_len)
+        self.epochs = epochs
+        self.reskoopnet = nn.Sequential(
+            nn.Linear(self.data[0].shape[-1], rank),
+            # nn.Sigmoid(),
+            # nn.Linear(512, rank),
+            nn.Sigmoid()
+        ).to(self.device)
+        self.optimizer = torch.optim.Adam(self.reskoopnet.parameters(), lr=learning_rate)
 
+    def create_hs_dataset(self, win_len=1000):
+        hs_dataset = []
+        for i in range(len(self.data)):
+            T, _ = self.data[i].shape
+            if T < win_len:
+                raise ValueError(f"Time dimension {T} is smaller than window size {win_len}.")
+            for start in range(T - win_len + 1):
+                window = self.data[i][start:start+win_len]
+                hs_dataset.append(window)
+        hs_dataset = torch.stack(hs_dataset, dim=0)
+        return hs_dataset
+
+    def forward(self, x):
+        return self.reskoopnet(x)
+
+    def residual_loss(self, batch_data):
+        X, Y = batch_data[:, :-1].to(self.device), batch_data[:, 1:].to(self.device)
+        psi_x = self.forward(X).reshape(-1, self.rank)
+        psi_y = self.forward(Y).reshape(-1, self.rank)
+        psi_xT = psi_x.T
+        G = torch.matmul(psi_xT, psi_x) + self.lamb * torch.eye(psi_xT.shape[0], device=self.device)
+        A = torch.matmul(psi_xT, psi_y)
+        try:
+            K = torch.linalg.solve(G, A)
+        except Exception as e:
+            print(e)
+            K = torch.linalg.pinv(G) @ A
+        _, S, Vh = torch.linalg.svd(K, full_matrices=False)
+        S_diag = torch.diag(S)
+        psi_x_v = torch.matmul(psi_x, Vh)
+        psi_x_v_k = torch.matmul(psi_x_v, S_diag)
+        psi_y_v = torch.matmul(psi_y, Vh)
+        J = torch.norm(psi_y_v - psi_x_v_k, p='fro')
+        return J
+
+    def fit(self, saved_path):
+        dataset = TensorDataset(self.hs_dataset)
+        dataloader = DataLoader(dataset, batch_size=512, shuffle=True)
+        self.reskoopnet.train()
+        min_loss = float('inf')
+        for epoch in tqdm(range(self.epochs), desc="Training Epochs", leave=False):
+            epoch_losses = []
+            for i, batch_data in enumerate(dataloader):
+                self.optimizer.zero_grad()
+                loss = self.residual_loss(batch_data[0])
+                loss.backward()
+                self.optimizer.step()
+                epoch_losses.append(loss.item())
+            avg_epoch_loss = sum(epoch_losses) / len(epoch_losses)
+            if avg_epoch_loss < min_loss:
+                min_loss = avg_epoch_loss
+                torch.save(self.reskoopnet.state_dict(), f'{saved_path}/reskoopnet.pt')
+            tqdm.write(f"Epoch {epoch+1} of {self.epochs} | avg_loss: {avg_epoch_loss:.4f} | min_loss: {min_loss:.4f}")
+
+class ResidualDMD:
+    def __init__(self, data, saved_path, rank=15, lamb=0.01, device='cuda'):
+        self.rank = rank
+        self.lamb = lamb
+        self.device = device
+        self.saved_path = saved_path
+        self.data = data
+        self.reskoopnet = nn.Sequential(
+            nn.Linear(self.data[0].shape[-1], rank),
+            # nn.Sigmoid(),
+            # nn.Linear(512, rank),
+            nn.Sigmoid()
+        ).to(self.device)
+        state_dict = torch.load(f'{self.saved_path}/reskoopnet.pt', map_location=device)
+        self.reskoopnet.load_state_dict(state_dict)
+        self.A_vs = []
+
+    def forward(self, x):
+        return self.reskoopnet(x)
+
+    def approximate_koopman_op(self):
+        for d in tqdm(self.data, desc="Approximating Koopman Operator"):
+            psi_x = self.forward(d[:-1].to(self.device))
+            psi_y = self.forward(d[1:].to(self.device))
+            psi_xT = psi_x.T
+            G = torch.matmul(psi_xT, psi_x) + self.lamb * torch.eye(psi_xT.shape[0], device=psi_xT.device)
+            A = torch.matmul(psi_xT, psi_y)
+            K = torch.linalg.solve(G, A)
+            self.A_vs.append(K)
+        return self.A_vs
+
+class ResKoopNet:
+    """
+    Residual Koopman Network. To obtain a neural network-based Koopman dictionary for analyzing model representations.
+    """
+    def __init__(self, data, rank=15, lamb=1e-3, learning_rate=0.001, epochs=10, device='cuda'):
+        self.rank = rank
+        self.lamb = lamb
+        self.data = data
+        self.epochs = epochs
+        self.make_dataset()
+        self.reskoopnet = nn.Sequential(
+            nn.Linear(data.shape[-1], rank),
+            nn.Sigmoid()
+        ).to(device)
+        self.optimizer = torch.optim.Adam(self.reskoopnet.parameters(), lr=learning_rate)
+
+        self.A_v = None
+
+    def make_dataset(self):
+        if self.data.ndim == 2:
+            # For tensor of shape T x D (one trial), generate a dataset using sliding window:
+            win_size = 1000  # you can make this parameterizable if needed
+            T, D = self.data.shape
+            if T < win_size:
+                raise ValueError(f"Time dimension {T} is smaller than window size {win_size}.")
+            # Stride shape to (B, win_size, D)
+            dataset = []
+            for start in range(T - win_size + 1):
+                window = self.data[start:start+win_size]  # shape: (win_size, D)
+                dataset.append(window)
+            self.dataset = torch.stack(dataset, dim=0)  # shape: (B, win_size, D)
+        elif self.data.ndim == 3:
+            self.dataset = torch.stack(self.data, dim=0)
+        else:
+            raise ValueError(f"Invalid data shape: {self.data.shape}. Expected 2D (samples, features) or 3D (trials, samples, features)")
+
+    def forward(self, x):
+        return self.reskoopnet(x)
+
+    def residual_loss(self, batch_data):
+        X, Y = batch_data[:, :-1], batch_data[:, 1:]
+        psi_x = self.forward(X).reshape(-1, self.rank)
+        psi_y = self.forward(Y).reshape(-1, self.rank)
+        psi_xT = psi_x.T
+        G = torch.matmul(psi_xT, psi_x) + self.lamb * torch.eye(psi_xT.shape[0], device=psi_xT.device)
+        A = torch.matmul(psi_xT, psi_y)
+        K = torch.linalg.solve(G, A)
+        _, S, Vh = torch.linalg.svd(K, full_matrices=False)
+        S_diag = torch.diag(S)
+        psi_x_v = torch.matmul(psi_x, Vh)
+        psi_x_v_k = torch.matmul(psi_x_v, S_diag)
+        psi_y_v = torch.matmul(psi_y, Vh)
+        J = torch.norm(psi_y_v - psi_x_v_k, p='fro')
+        return J
+
+    def fit_koopman_dict(self, saved_path):
+        dataset = TensorDataset(self.dataset)
+        dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
+        self.reskoopnet.train()
+        from tqdm import tqdm
+
+        from tqdm import trange
+
+        epoch_bar = trange(self.epochs, desc="Training Epochs")
+        for epoch in epoch_bar:
+            epoch_losses = []
+            for batch_data in dataloader:
+                self.optimizer.zero_grad()
+                loss = self.residual_loss(batch_data[0]) / batch_data[0].shape[0]
+                loss.backward()
+                self.optimizer.step()
+                epoch_losses.append(loss.item())
+            avg_epoch_loss = sum(epoch_losses) / len(epoch_losses)
+            epoch_bar.set_postfix({'avg_loss': avg_epoch_loss})
+        torch.save(self.reskoopnet.state_dict(), f'{saved_path}/reskoopnet.pt')
+
+    def approx_koopman_op(self):
+        psi_x = self.forward(self.data[:-1])
+        psi_y = self.forward(self.data[1:])
+        psi_xT = psi_x.T
+        G = torch.matmul(psi_xT, psi_x) + self.lamb * torch.eye(psi_xT.shape[0], device=psi_xT.device)
+        A = torch.matmul(psi_xT, psi_y)
+        K = torch.linalg.solve(G, A)
+
+        self.A_v = K

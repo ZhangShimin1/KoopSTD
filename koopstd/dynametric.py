@@ -1,7 +1,6 @@
 import sys
 from koopstd.kmd import *
 from koopstd.geometric import *
-from koopstd.datasets import *
 
 import torch
 import numpy as np
