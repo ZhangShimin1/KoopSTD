@@ -22,7 +22,7 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 ```
 
-Install PyTorch first (CPU or CUDA), then install KoopSTD:
+Install PyTorch first (CPU or CUDA),:
 
 ```bash
 # CPU (default PyPI wheels)

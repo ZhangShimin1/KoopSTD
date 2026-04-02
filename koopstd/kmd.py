@@ -33,16 +33,6 @@ class KMD:
         self.verbose = verbose
         self.A_v, self.E, self.S, self.V, self.Vh, self.W, self.W_prime = None, None, None, None, None, None, None
 
-        # TODO: Backends specification
-        # if backend == 'numpy':
-        #     self.xp = np
-        # elif backend == 'cupy':
-        #     self.xp = cp
-        # elif backend == 'pytorch':
-        #     self.xp = torch
-        # else:
-        #     raise ValueError(f"Unsupported backend: {backend}. Choose from 'numpy', 'pytorch', or 'cupy'")
-
     def init_data(self):
         if isinstance(self.data, np.ndarray):
             self.data = torch.from_numpy(self.data).to(self.device)
