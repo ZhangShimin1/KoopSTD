@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "koopstd"
+version = "0.1.0"
+description = "Access the similarity between two dynamical systems with KoopSTD."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "numpy>=1.24",
+  "scipy>=1.10",
+  "scikit-learn>=1.2",
+  "matplotlib>=3.7",
+  "tqdm>=4.65",
+  "POT>=0.9",
+]
+
+[project.optional-dependencies]
+cpu = [
+  "torch>=2.2",
+  "torchvision>=0.17",
+  "torchaudio>=2.2",
+]
+cuda = [
+  "torch>=2.2",
+  "torchvision>=0.17",
+  "torchaudio>=2.2",
+  "triton>=3.2",
+]
+examples = [
+  "pandas>=2.0",
+  "seaborn>=0.13",
+  "transformers>=4.50",
+  "huggingface-hub>=0.30",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["koopstd*"]

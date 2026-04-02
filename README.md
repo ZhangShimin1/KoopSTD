@@ -13,11 +13,35 @@ ICML 2025 [(paper)](https://openreview.net/forum?id=29eZ8pWc8E)
 </div>
 
 
-## Environmental setup
-This requires Python version 3.9 or higher. Install all the necessary packages by:
-`pip install -r requirements.txt`
+## Environment setup
+Python 3.9+ is required. We recommend installing KoopSTD as a package in a virtual environment:
 
-The CUDA is highly recommended to accelerate PyTorch computations. In the future, we plan to add parallelized processing for DMD and spectrum pair-wise comparisons on large datasets. For CPU-only environments, please comment out any dependencies that start with `"nvidia"`.
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+```
+
+Install PyTorch first (CPU or CUDA), then install KoopSTD:
+
+```bash
+# CPU (default PyPI wheels)
+python -m pip install "torch>=2.2" "torchvision>=0.17" "torchaudio>=2.2"
+
+# OR CUDA wheels (example: CUDA 12.1)
+python -m pip install --index-url https://download.pytorch.org/whl/cu121 \
+  "torch>=2.2" "torchvision>=0.17" "torchaudio>=2.2"
+
+# Install KoopSTD in editable mode
+python -m pip install -e .
+```
+
+Optional dependency groups:
+
+```bash
+# Extra packages used by examples
+python -m pip install -e ".[examples]"
+```
 
 # Basic usage
 For the experiments presented in our paper, we compare the distance between every pair of samples in a dataset.
