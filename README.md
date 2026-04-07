@@ -14,33 +14,46 @@ ICML 2025 [(paper)](https://openreview.net/forum?id=29eZ8pWc8E)
 
 
 ## Environment setup
-Python 3.9+ is required. We recommend installing KoopSTD as a package in a virtual environment:
+Follow the instructions below to set up the KoopSTD environment using Conda. This guide assumes you have Anaconda or Miniconda installed.
+
+### 1) Create and Activate the Conda Environment
+
+First, create a new Conda environment named `koopman` with Python 3.9 and activate it:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
+conda create -n koopman python=3.9
+conda activate koopman
 ```
 
-Install PyTorch first (CPU or CUDA),:
+### 2) Install PyTorch
 
+Install PyTorch according to your hardware requirements:
+
+**For CPU-only support:**
 ```bash
-# CPU (default PyPI wheels)
-python -m pip install "torch>=2.2" "torchvision>=0.17" "torchaudio>=2.2"
+pip install "torch>=2.2" "torchvision>=0.17" "torchaudio>=2.2"
+```
 
-# OR CUDA wheels (example: CUDA 12.1)
-python -m pip install --index-url https://download.pytorch.org/whl/cu121 \
+**For CUDA support (e.g., CUDA 12.1):**
+```bash
+pip install --index-url https://download.pytorch.org/whl/cu121 \
   "torch>=2.2" "torchvision>=0.17" "torchaudio>=2.2"
-
-# Install KoopSTD in editable mode
-python -m pip install -e .
 ```
 
-Optional dependency groups:
+Refer to the [official PyTorch website](https://pytorch.org/get-started/locally/) if you require a different CUDA version.
+
+### 3) Install KoopSTD
+
+Install the package in editable mode:
 
 ```bash
-# Extra packages used by examples
-python -m pip install -e ".[examples]"
+pip install -e .
+```
+
+If you wish to include the optional example dependencies, use:
+
+```bash
+pip install -e ".[examples]"
 ```
 
 # Basic usage
@@ -56,22 +69,23 @@ data = [trajectory1, trajectory2, ...]
 
 # Step 2: Set up KoopSTD parameters
 koopstd_params = {
-    'hop_size': 128,        # Window sliding step size of STFT
-    'win_len': 1024,        # Window length STFT
-    'rank': 5,              # The first rank modes with the smallest residual
-    'lamb': 0               # Regularization parameter
+    'hop_size': 1,        # Window sliding step size of STFT
+    'win_len': 100,        # Window length STFT
+    'rank': 6,              # The first rank modes with the smallest residual
+    'lamb': 0.1               # Regularization parameter
 }
 
 # Step 3: Set up distance metric parameters
 distance_params = {
     'p': 1,                 # Order for Wasserstein distance
-    'method': 'emd'         # Earth Mover's Distance
+    'method': 'emd',         # Earth Mover's Distance
+    'feature_type': 'eig'
 }
 
 # Step 4: Initialize KoopSTD metric
 koopstd = KoopOpMetric(
     X=data,                          # Your trajectory data
-    kmd_method='koopstd',            
+    kmd_method='koopstd',
     kmd_params=koopstd_params,       # KoopSTD parameters
     dist='wasserstein',              # Distance metric
     dist_params=distance_params,     # Distance parameters

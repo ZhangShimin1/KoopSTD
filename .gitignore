@@ -1,0 +1,16 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Packaging / install metadata (editable installs, setuptools)
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Virtual environments (common names)
+.venv/
+venv/
+env/
