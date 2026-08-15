@@ -31,7 +31,7 @@ class KMD:
         self.rank = rank
         self.lamb = lamb
         self.verbose = verbose
-        self.A_v, self.E, self.S, self.V, self.Vh, self.W, self.W_prime = None, None, None, None, None, None, None
+        self.A_v, self.E, self.S, self.U, self.V, self.Vh, self.W, self.W_prime = None, None, None, None, None, None, None, None
 
     def init_data(self):
         if isinstance(self.data, np.ndarray):
@@ -138,31 +138,58 @@ class KoopSTD(KMD):
         else:
             E = self.E
 
-        _, self.S, self.V = torch.linalg.svd(E.T, full_matrices=False)
+        # z = E.T = U Σ V^T. Residual ranking uses this SVD of z, not the
+        # closed-form DMD operator YX^+. torch.linalg.svd returns Vh = V^T.
+        self.U, self.S, self.Vh = torch.linalg.svd(E.T, full_matrices=False)
+        self.V = self.Vh.T
 
         if E.shape[0] < E.shape[1]:  # T < N
             E = E[:, :E.shape[0]]
         self.E_minus = E[:-1]
         self.E_plus = E[1:]
 
-    def reduced_rank(self):
-        M = torch.matmul(self.E_minus.T.conj(), self.E_minus)
-        N = torch.matmul(self.E_minus.T.conj(), self.E_plus)
-        O = torch.matmul(self.E_plus.T.conj(), self.E_plus)
+    def _gram_matrices(self):
+        X_X = torch.matmul(self.E_minus.T.conj(), self.E_minus)
+        X_Y = torch.matmul(self.E_minus.T.conj(), self.E_plus)
+        Y_Y = torch.matmul(self.E_plus.T.conj(), self.E_plus)
+        return X_X, X_Y, Y_Y
 
-        egvalues, egvectors = self.S, self.V
-        residuals = []
-        for j, (eigenvalue, eigenvector) in enumerate(zip(egvalues, egvectors.T)):
-            residual = self.compute_residuals(M, N, O, eigenvalue, eigenvector)
-            residuals.append(residual)
-        residuals = torch.tensor(residuals)
-        topk_indices = torch.topk(-residuals, self.rank, largest=False).indices
-        V = self.V.T
+    def _select_modes_by_residual(self):
+        """
+        Rank selection via ||Y - λ X||_v at z's own SVD pairs (σ_j, column j of V^T).
+
+        Returns indices of the `rank` modes with the smallest residuals.
+        """
+        X_X, X_Y, Y_Y = self._gram_matrices()
+        n_modes = self.S.shape[0]
+        # Mode j corresponds to column j of V^T (Vh), not a row of V^T / column of V.
+        eigenvectors = self.Vh[:, :n_modes]
+        eigenvalues = self.S[:n_modes].to(dtype=X_X.dtype)
+
+        YYv = Y_Y @ eigenvectors
+        XYv = X_Y @ eigenvectors
+        XYHv = X_Y.T.conj() @ eigenvectors
+        XXv = X_X @ eigenvectors
+        v_conj = eigenvectors.conj()
+        yy = (v_conj * YYv).sum(dim=0)
+        xy = (v_conj * XYv).sum(dim=0)
+        yx = (v_conj * XYHv).sum(dim=0)
+        xx = (v_conj * XXv).sum(dim=0)
+
+        numerator = yy - eigenvalues * xy - eigenvalues.conj() * yx + (eigenvalues.abs() ** 2) * xx
+        residuals = torch.sqrt(torch.abs(numerator) / torch.abs(xx))
+        k = min(self.rank, residuals.numel())
+        return torch.topk(residuals, k, largest=False).indices
+
+    def _build_rank_projections(self, topk_indices):
+        # Time-mode matrix V (columns of V = rows of V^T), then keep residual-selected modes.
+        V = self.V
+        rank = topk_indices.numel()
 
         if self.n_trials > 1:
             V = V.reshape(self.E.shape)
             V_rank = V[:, :, topk_indices]
-            new_shape = (self.E.shape[0] * (self.E.shape[1] - 1), self.rank)
+            new_shape = (self.E.shape[0] * (self.E.shape[1] - 1), rank)
             V_minus_rank = V_rank[:, :-1].reshape(new_shape)
             V_plus_rank = V_rank[:, 1:].reshape(new_shape)
         else:
@@ -170,30 +197,20 @@ class KoopSTD(KMD):
             V_minus_rank = V_rank[:-1]
             V_plus_rank = V_rank[1:]
 
-        self.W = V_minus_rank
-        self.W_prime = V_plus_rank
+        return V_minus_rank, V_plus_rank
+
+    def reduced_rank(self):
+        topk_indices = self._select_modes_by_residual()
+        self.W, self.W_prime = self._build_rank_projections(topk_indices)
+        self.rank = self.W.shape[1]
 
     def residual_dmd(self):
         """
-        Standard implementation of ResDMD, however, for the sake of efficiency,
-        we don't recommend it in large dataset comparison.
+        Residual-ranked DMD using z's SVD pairs rather than the YX^+ closed form.
+        For large pairwise comparisons, prefer fit() / reduced_rank().
         """
-        self.Vt_minus = self.V[:-1]
-        self.Vt_plus = self.V[1:]
-
-        X_X = torch.matmul(self.Vt_plus.T.conj(), self.Vt_plus)
-        X_Y = torch.matmul(self.Vt_plus.T.conj(), self.Vt_minus)
-        Y_Y = torch.matmul(self.Vt_minus.T.conj(), self.Vt_minus)
-
-        A_full = torch.linalg.inv(self.Vt_minus.T @ self.Vt_minus) @ self.Vt_minus.T @ self.Vt_plus
-        _, egvalues, egvectors = torch.linalg.svd(A_full, full_matrices=True)
-        residuals = []
-        for j, (eigenvalue, eigenvector) in enumerate(zip(egvalues, egvectors.T)):
-            residual = self.compute_residual(X_X, X_Y, Y_Y, eigenvalue, eigenvector)
-            residuals.append(residual)
-        residuals = torch.tensor(residuals)
-        topk_indices = torch.topk(-residuals, self.rank, largest=False).indices
-        self.A_v = egvalues[topk_indices].view(-1,1)  # direct eigenvalues
+        self.reduced_rank()
+        self.compute_dmd()
 
     def compute_residuals(self, X_X, X_Y, Y_Y, eigenvalue, eigenvector):
         numerator = torch.matmul(
